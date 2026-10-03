@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<!--
+  本文件由 birthday-web/build.js 生成，请勿手改。
+  构建时间: 2026-10-03T13:59:21.556Z
+  lunar     <- ..\birthday-countdown\lib\lunar.js  (sha256 47b1f181028c)
+  birthday  <- ..\birthday-countdown\lib\birthday.js  (sha256 a31529687f47)
+  storage   <- ..\birthday-countdown\lib\storage.js  (sha256 9ac38a40ac6c)
+  app       <- ..\birthday-web\app.js  (sha256 f75581a1d425)
+  重新生成: node build.js
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>亲人生日倒计时</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --fg: #1f2328;
+    --sub: #656d76;
+    --line: #e4e7eb;
+    --chip: #eef0f3;
+    --accent: #e91e63;
+    --accent-soft: #fff1f5;
+    --soon: #fff8ec;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 4px 14px rgba(16,24,40,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171b;
+    --panel: #1c2026;
+    --fg: #e8eaed;
+    --sub: #98a2b0;
+    --line: #2b3138;
+    --chip: #262c33;
+    --accent: #ff6f9c;
+    --accent-soft: #33202a;
+    --soon: #2f2a1e;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 15px/1.6 "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 22px 70px; }
+
+  /* ---------------- 顶栏 ---------------- */
+  .top { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+  .top h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
+  .top .today { color: var(--sub); font-size: 13px; }
+  .top .sp { flex: 1; }
+  button {
+    padding: 7px 14px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--fg); font: inherit; font-size: 13.5px;
+    cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { color: #fff; opacity: .92; }
+  button.ghost { background: transparent; }
+
+  /* ---------------- 英雄卡：下一个生日 ---------------- */
+  .hero {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+    padding: 26px 28px; margin-bottom: 24px; box-shadow: var(--shadow);
+    display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
+    position: relative; overflow: hidden;
+  }
+  .hero::after {
+    content: ''; position: absolute; right: -40px; top: -40px;
+    width: 170px; height: 170px; border-radius: 50%;
+    background: var(--accent-soft); pointer-events: none;
+  }
+  .hero.today { border-color: var(--accent); }
+  .hero .big {
+    font-size: 62px; font-weight: 800; color: var(--accent);
+    line-height: 1; letter-spacing: -2px; display: flex; align-items: baseline; gap: 6px;
+    position: relative; z-index: 1;
+  }
+  .hero .big .unit { font-size: 17px; font-weight: 500; letter-spacing: 0; color: var(--sub); }
+  .hero .who { position: relative; z-index: 1; min-width: 0; }
+  .hero .who .nm { font-size: 21px; font-weight: 700; }
+  .hero .who .dt { color: var(--sub); font-size: 13.5px; margin-top: 3px; }
+  .hero .who .tag {
+    display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 9px;
+    background: var(--chip); color: var(--sub); margin-right: 6px; vertical-align: 1px;
+  }
+  .hero .who .tag.lunar { background: var(--accent-soft); color: var(--accent); }
+  .hero .who .age { color: var(--sub); font-size: 13px; }
+
+  /* ---------------- 列表 ---------------- */
+  .bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .bar .label { color: var(--sub); font-size: 13px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; padding: 5px 12px; font-size: 13px; background: transparent; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .seg button.on:hover { color: #fff; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px; box-shadow: var(--shadow); cursor: pointer;
+    transition: transform .12s, border-color .15s;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .card.today { border-color: var(--accent); background: var(--accent-soft); }
+  .card.soon { background: var(--soon); }
+  .card .n {
+    font-size: 30px; font-weight: 800; color: var(--accent);
+    min-width: 66px; text-align: center; line-height: 1.05; letter-spacing: -1px;
+  }
+  .card .n small { display: block; font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--sub); }
+  .card .info { flex: 1; min-width: 0; }
+  .card .info .nm { font-weight: 700; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .info .dt { color: var(--sub); font-size: 12.5px; margin-top: 2px; word-break: break-all; }
+  .card .info .note { color: var(--sub); font-size: 12px; margin-top: 4px; opacity: .9; }
+  .card .age {
+    font-size: 11.5px; color: var(--sub); background: var(--chip);
+    border-radius: 10px; padding: 1px 8px; white-space: nowrap; align-self: flex-start;
+  }
+
+  /* ---------------- 分享提示条 ---------------- */
+  .share-banner {
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    color: var(--accent); border-radius: 12px; padding: 10px 14px;
+    font-size: 13px; margin-bottom: 18px;
+  }
+  #shareOut {
+    word-break: break-all; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 9px; padding: 9px 11px; font-size: 12px; color: var(--sub);
+    max-height: 130px; overflow-y: auto; user-select: all;
+  }
+  #shareOut code { color: var(--fg); font-size: 11.5px; }
+
+  /* ---------------- 空状态 ---------------- */
+  .empty {
+    background: var(--panel); border: 1px dashed var(--line); border-radius: 16px;
+    padding: 54px 22px; text-align: center; color: var(--sub);
+  }
+  .empty .big { font-size: 44px; margin-bottom: 10px; }
+
+  /* ---------------- 抽屉 ---------------- */
+  .mask {
+    position: fixed; inset: 0; background: rgba(8,10,12,.42);
+    opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 40;
+  }
+  .mask.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(430px, 94vw);
+    background: var(--panel); border-left: 1px solid var(--line);
+    transform: translateX(102%); transition: transform .22s ease; z-index: 41;
+    display: flex; flex-direction: column;
+  }
+  .drawer.open { transform: none; }
+  .d-head {
+    padding: 16px 20px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .d-head .t { font-weight: 700; font-size: 16px; flex: 1; }
+  .d-body { flex: 1; overflow-y: auto; padding: 18px 20px; }
+  label { display: block; font-size: 12.5px; color: var(--sub); margin-bottom: 5px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 8px 10px; border-radius: 9px; font: inherit; font-size: 14px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+  }
+  textarea { min-height: 54px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .row > * { min-width: 0; }
+  .chk { display: flex; align-items: center; gap: 7px; font-size: 14px; }
+  .chk input { width: auto; }
+  .hint { font-size: 12.5px; color: var(--sub); margin: 8px 0 12px; }
+  .prev {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font-size: 13px; color: var(--sub); margin: 10px 0 14px;
+  }
+  .prev b { color: var(--fg); }
+  .sep { height: 1px; background: var(--line); margin: 18px 0; }
+  .li {
+    display: flex; align-items: center; gap: 10px; padding: 9px 11px;
+    border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px;
+  }
+  .li .grow { flex: 1; min-width: 0; }
+  .li .nm { font-weight: 600; font-size: 14px; }
+  .li .meta { font-size: 12px; color: var(--sub); }
+  .mini {
+    border: 1px solid var(--line); background: transparent; color: var(--sub);
+    border-radius: 7px; cursor: pointer; font: inherit; font-size: 12px; padding: 3px 9px;
+  }
+  .mini:hover { color: var(--accent); border-color: var(--accent); }
+  .mini.danger:hover { color: #e5484d; border-color: #e5484d; }
+  .err { color: #e5484d; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(12px);
+    background: #1f2328; color: #fff; padding: 10px 18px; border-radius: 10px;
+    font-size: 13.5px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    z-index: 60;
+  }
+  #toast.show { opacity: .96; transform: translateX(-50%); }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 20px 14px 60px; }
+    .hero { padding: 20px; gap: 16px; }
+    .hero .big { font-size: 48px; }
+    .hero .who .nm { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>亲人生日倒计时</h1>
+      <div class="today" id="todayLabel"></div>
+    </div>
+    <span class="sp"></span>
+    <button id="themeBtn" title="切换深浅色">🌓</button>
+    <button class="primary" id="addBtn">＋ 添加生日</button>
+  </div>
+
+  <div id="shareBanner" class="share-banner" style="display:none"></div>
+
+  <div id="heroWrap"></div>
+
+  <div class="bar">
+    <span class="label">排序</span>
+    <div class="seg" id="sortSeg">
+      <button data-sort="daysLeft" class="on">剩余天数</button>
+      <button data-sort="month">按月份</button>
+      <button data-sort="name">按称呼</button>
+    </div>
+    <span class="sp" style="flex:1"></span>
+    <button class="ghost" id="manageBtn">管理</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- 抽屉 -->
+<div class="mask" id="mask"></div>
+<aside class="drawer" id="drawer">
+  <div class="d-head">
+    <span class="t" id="dTitle">添加生日</span>
+    <button class="mini" id="dClose">关闭</button>
+  </div>
+  <div class="d-body">
+    <label for="fName">称呼</label>
+    <input type="text" id="fName" maxlength="20" placeholder="如：妈妈">
+
+    <div class="row" style="margin-top:12px">
+      <div style="flex:1.1">
+        <label for="fCal">历法</label>
+        <select id="fCal">
+          <option value="solar">公历（阳历）</option>
+          <option value="lunar">农历（阴历）</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <label for="fMonth">月</label>
+        <select id="fMonth"></select>
+      </div>
+      <div style="flex:1">
+        <label for="fDay">日</label>
+        <select id="fDay"></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div style="flex:1">
+        <label for="fYear">出生年份（可选，用于算周岁）</label>
+        <input type="number" id="fYear" min="1900" max="2100" placeholder="如 1970">
+      </div>
+    </div>
+
+    <div class="row" id="leapRow" style="display:none">
+      <span class="chk"><input type="checkbox" id="fLeap"><span>这是农历闰月</span></span>
+    </div>
+
+    <label for="fNote">备注（可选）</label>
+    <textarea id="fNote" maxlength="120" placeholder="如：喜欢喝茶"></textarea>
+
+    <div class="prev" id="preview">填写后这里会显示下一次生日的日期</div>
+
+    <div class="row">
+      <button class="primary" id="saveBtn">保存</button>
+      <button id="resetBtn">清空</button>
+    </div>
+
+    <div class="sep"></div>
+    <div class="chk" style="margin-bottom:10px">
+      <input type="checkbox" id="optAge"><span>显示周岁</span>
+    </div>
+    <div class="chk" style="margin-bottom:12px">
+      <input type="checkbox" id="optHero"><span>顶部显示放大的下一个生日</span>
+    </div>
+
+    <div class="sep"></div>
+    <label>已有生日</label>
+    <div id="manageList"></div>
+
+    <div class="sep"></div>
+    <div class="row">
+      <button id="exportBtn">导出 JSON</button>
+      <button id="importBtn">导入 JSON</button>
+      <button class="mini danger" id="clearBtn" style="margin-left:auto">清空全部</button>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <button id="shareBtn" style="flex:1">🔗 生成分享链接（网址带数据）</button>
+    </div>
+    <div class="hint" id="shareOut" style="display:none"></div>
+    <input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+    <div class="hint" style="margin-top:10px">
+      数据保存在本机浏览器里，不会上传。换电脑时用导出/导入迁移。
+    </div>
+  </div>
+</aside>
+
+<div id="toast"></div>
+
+<script>
+/* ==== lunar (源 sha256 47b1f181028c) ==== */
+/**
+ * 农历 / 公历 互转工具
+ * 数据表 lunarInfo：1900-2100 年，每年一个 17 位编码
+ *   bit 16      闰月天数（1=30 天，0=29 天）
+ *   bit 15..4   正月到十二月（1=30 天，0=29 天），bit15 对应正月
+ *   bit 3..0    闰月月份（0 表示该年无闰月）
+ */
+
+const LUNAR_INFO = [
+  0x04bd8, 0x04ae0, 0x0a570, 0x054d5, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2, // 1900-1909
+  0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977, // 1910-1919
+  0x04970, 0x0a4b0, 0x0b4b5, 0x06a50, 0x06d40, 0x1ab54, 0x02b60, 0x09570, 0x052f2, 0x04970, // 1920-1929
+  0x06566, 0x0d4a0, 0x0ea50, 0x06e95, 0x05ad0, 0x02b60, 0x186e3, 0x092e0, 0x1c8d7, 0x0c950, // 1930-1939
+  0x0d4a0, 0x1d8a6, 0x0b550, 0x056a0, 0x1a5b4, 0x025d0, 0x092d0, 0x0d2b2, 0x0a950, 0x0b557, // 1940-1949
+  0x06ca0, 0x0b550, 0x15355, 0x04da0, 0x0a5d0, 0x14573, 0x052d0, 0x0a9a8, 0x0e950, 0x06aa0, // 1950-1959
+  0x0aea6, 0x0ab50, 0x04b60, 0x0aae4, 0x0a570, 0x05260, 0x0f263, 0x0d950, 0x05b57, 0x056a0, // 1960-1969
+  0x096d0, 0x04dd5, 0x04ad0, 0x0a4d0, 0x0d4d4, 0x0d250, 0x0d558, 0x0b540, 0x0b6a0, 0x195a6, // 1970-1979
+  0x095b0, 0x049b0, 0x0a974, 0x0a4b0, 0x0b27a, 0x06a50, 0x06d40, 0x0af46, 0x0ab60, 0x09570, // 1980-1989
+  0x04af5, 0x04970, 0x064b0, 0x074a3, 0x0ea50, 0x06b58, 0x055c0, 0x0ab60, 0x096d5, 0x092e0, // 1990-1999
+  0x0c960, 0x0d954, 0x0d4a0, 0x0da50, 0x07552, 0x056a0, 0x0abb7, 0x025d0, 0x092d0, 0x0cab5, // 2000-2009
+  0x0a950, 0x0b4a0, 0x0baa4, 0x0ad50, 0x055d9, 0x04ba0, 0x0a5b0, 0x15176, 0x052b0, 0x0a930, // 2010-2019
+  0x07954, 0x06aa0, 0x0ad50, 0x05b52, 0x04b60, 0x0a6e6, 0x0a4e0, 0x0d260, 0x0ea65, 0x0d530, // 2020-2029
+  0x05aa0, 0x076a3, 0x096d0, 0x04afb, 0x04ad0, 0x0a4d0, 0x1d0b6, 0x0d250, 0x0d520, 0x0dd45, // 2030-2039
+  0x0b5a0, 0x056d0, 0x055b2, 0x049b0, 0x0a577, 0x0a4b0, 0x0aa50, 0x1b255, 0x06d20, 0x0ada0, // 2040-2049
+  0x14b63, 0x09370, 0x049f8, 0x04970, 0x064b0, 0x168a6, 0x0ea50, 0x06b20, 0x1a6c4, 0x0aae0, // 2050-2059
+  0x0a2e0, 0x0d2e3, 0x0c960, 0x0d557, 0x0d4a0, 0x0da50, 0x05d55, 0x056a0, 0x0a6d0, 0x055d4, // 2060-2069
+  0x052d0, 0x0a9b8, 0x0a950, 0x0b4a0, 0x0b6a6, 0x0ad50, 0x055a0, 0x0aba4, 0x0a5b0, 0x052b0, // 2070-2079
+  0x0b273, 0x06930, 0x07337, 0x06aa0, 0x0ad50, 0x14b55, 0x04b60, 0x0a570, 0x054e4, 0x0d160, // 2080-2089
+  0x0e968, 0x0d520, 0x0daa0, 0x16aa6, 0x056d0, 0x04ae0, 0x0a9d4, 0x0a2d0, 0x0d150, 0x0f252, // 2090-2099
+  0x0d520,                                                                                   // 2100
+];
+
+const MIN_YEAR = 1900;
+const MAX_YEAR = 2100;
+// 1900 年正月初一对应的公历日期
+const BASE_DATE = Date.UTC(1900, 0, 31);
+
+const MONTH_CN = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊'];
+const DAY_CN = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+  '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+  '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+
+const MS_PER_DAY = 86400000;
+
+function info(year) {
+  return LUNAR_INFO[year - MIN_YEAR];
+}
+
+/** 该农历年闰几月，0 表示无闰月 */
+function leapMonth(year) {
+  return info(year) & 0xf;
+}
+
+/** 该农历年第 month 个月（1-12）的天数；闰月请用 leapDays */
+function monthDays(year, month) {
+  // 经枚举验证：bit16 对应正月，bit5 对应十二月
+  return (info(year) >> (16 - month)) & 0x1 ? 30 : 29;
+}
+
+/** 该农历年闰月的天数，无闰月返回 0 */
+function leapDays(year) {
+  if (!leapMonth(year)) return 0;
+  return (info(year) >> 16) & 0x1 ? 30 : 29;
+}
+
+/** 该农历年总天数 */
+function yearDays(year) {
+  let sum = 348; // 12 * 29
+  for (let i = 0x8000; i > 0x8; i >>= 1) {
+    sum += (info(year) & i) ? 1 : 0;
+  }
+  return sum + leapDays(year);
+}
+
+function toUTC(y, m, d) {
+  return Date.UTC(y, m - 1, d);
+}
+
+/** 公历 -> 农历（m 为 1-12） */
+function solarToLunar(y, m, d) {
+  if (y < MIN_YEAR || y > MAX_YEAR) return null;
+  let offset = Math.floor((toUTC(y, m, d) - BASE_DATE) / MS_PER_DAY);
+  if (offset < 0) return null;
+
+  let year = MIN_YEAR;
+  for (; year <= MAX_YEAR; year++) {
+    const yd = yearDays(year);
+    if (offset < yd) break;
+    offset -= yd;
+  }
+  if (year > MAX_YEAR) return null;
+
+  const lp = leapMonth(year);
+  let isLeap = false;
+  let month = 1;
+  for (; month <= 12; month++) {
+    const days = monthDays(year, month);
+    if (offset < days) break;
+    offset -= days;
+    // 闰月排在同名普通月之后
+    if (lp === month) {
+      const ld = leapDays(year);
+      if (offset < ld) {
+        isLeap = true;
+        break;
+      }
+      offset -= ld;
+    }
+  }
+
+  return { year, month, day: offset + 1, isLeap };
+}
+
+/** 农历 -> 公历；isLeap 表示闰月。返回 {year, month, day} 或 null */
+function lunarToSolar(ly, lm, ld, isLeap = false) {
+  if (ly < MIN_YEAR || ly > MAX_YEAR) return null;
+  if (lm < 1 || lm > 12) return null;
+  const lp = leapMonth(ly);
+  if (isLeap && lp !== lm) return null; // 该年此月不是闰月
+
+  let offset = 0;
+  for (let y = MIN_YEAR; y < ly; y++) offset += yearDays(y);
+  // 只累加「目标月之前」的天数，目标月自身不计入（月内第几天由 ld 体现）
+  for (let m = 1; m < lm; m++) {
+    offset += monthDays(ly, m);
+    if (lp === m) offset += leapDays(ly); // 闰月排在同名月之后，已完整跳过
+  }
+  // 目标月是闰月时，把同名的普通月补上
+  if (isLeap) offset += monthDays(ly, lm);
+  offset += ld - 1;
+
+  const dt = new Date(BASE_DATE + offset * MS_PER_DAY);
+  return { year: dt.getUTCFullYear(), month: dt.getUTCMonth() + 1, day: dt.getUTCDate() };
+}
+
+/** 格式化农历中文，如「腊月初八」「闰二月十五」 */
+function formatLunar(l) {
+  if (!l) return '';
+  const m = (l.isLeap ? '闰' : '') + MONTH_CN[l.month - 1] + '月';
+  return m + DAY_CN[l.day - 1];
+}
+
+const LUNAR_API = {
+  LUNAR_INFO, MIN_YEAR, MAX_YEAR, leapMonth, monthDays, leapDays, yearDays,
+  solarToLunar, lunarToSolar, formatLunar, MONTH_CN, DAY_CN,
+};
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = LUNAR_API;
+}
+
+// 浏览器 / 扩展页面 / service worker 下挂到全局，供其他脚本使用
+(function (g) {
+  if (g) g.LunarUtil = LUNAR_API;
+})(typeof globalThis !== 'undefined' ? globalThis
+  : typeof self !== 'undefined' ? self
+    : typeof window !== 'undefined' ? window
+      : null);
+
+</script>
+<script>
+/* ==== birthday (源 sha256 a31529687f47) ==== */
+/**
+ * 生日倒数计算
+ * 数据模型 birthday:
+ *   { id, name, month, day, calendar: 'solar'|'lunar', isLeap: bool,
+ *     year?: number, note?: string }
+ *   - calendar='lunar' 时 month/day 为农历月/日，isLeap 表示闰月
+ *   - year 为出生年份（公历年），用于计算周岁；不填则不显示年龄
+ */
+
+(function (root, factory) {
+  const G = typeof globalThis !== 'undefined' ? globalThis : root;
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = factory(require('./lunar.js'));
+  } else {
+    if (!G.LunarUtil) throw new Error('birthday.js 需要先加载 lib/lunar.js');
+    G.BirthdayUtil = factory(G.LunarUtil);
+  }
+})(typeof self !== 'undefined' ? self : this, function (L) {
+
+  const MS_PER_DAY = 86400000;
+
+  /** 取本地当天 00:00 的 UTC 时间戳（按本地时区判定“今天”） */
+  function startOfDay(d) {
+    const dt = d ? new Date(d) : new Date();
+    return Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  }
+
+  function daysBetween(a, b) {
+    return Math.round((b - a) / MS_PER_DAY);
+  }
+
+  /**
+   * 计算某公历年内、该农历月的实际天数可用性，返回公历日期
+   * @returns {{y:number,m:number,d:number}|null}
+   */
+  function lunarDateInYear(month, day, isLeap, solarYear) {
+    // 农历年与公历年大致对齐：农历某月通常落在该公历年内
+    for (const ly of [solarYear, solarYear + 1]) {
+      const lp = L.leapMonth(ly);
+      if (isLeap && lp !== month) continue;
+      const maxDay = isLeap ? L.leapDays(ly) : L.monthDays(ly, month);
+      if (day > maxDay) continue;
+      const s = L.lunarToSolar(ly, month, day, isLeap);
+      if (s && s.year === solarYear) return s;
+    }
+    // 闰月当年不存在 -> 退回同名普通月
+    if (isLeap) return lunarDateInYear(month, day, false, solarYear);
+    // 该月没有三十日 -> 退到廿九
+    if (day === 30) return lunarDateInYear(month, 29, false, solarYear);
+    return null;
+  }
+
+  /** 公历生日在指定年份的实际日期（处理 2/29） */
+  function solarDateInYear(month, day, solarYear) {
+    if (month === 2 && day === 29) {
+      const leap = (solarYear % 4 === 0 && solarYear % 100 !== 0) || solarYear % 400 === 0;
+      if (!leap) return { year: solarYear, month: 2, day: 28 };
+    }
+    return { year: solarYear, month, day };
+  }
+
+  /**
+   * 下一次生日
+   * @param birthday 生日对象
+   * @param todayTs  今天 00:00 的时间戳（默认取当前）
+   * @returns {{date:Date, daysLeft:number, solar:{y,m,d}, lunar:object, targetYear:number}}
+   */
+  function nextOccurrence(birthday, todayTs) {
+    const today = todayTs !== undefined ? todayTs : startOfDay();
+    const todayDate = new Date(today);
+    const baseYear = todayDate.getUTCFullYear();
+
+    const results = [];
+    for (const y of [baseYear, baseYear + 1, baseYear + 2]) {
+      let sd;
+      if (birthday.calendar === 'lunar') {
+        sd = lunarDateInYear(birthday.month, birthday.day, !!birthday.isLeap, y);
+      } else {
+        sd = solarDateInYear(birthday.month, birthday.day, y);
+      }
+      if (!sd) continue;
+      const ts = Date.UTC(sd.year, sd.month - 1, sd.day);
+      if (ts < today) continue;
+      results.push({ ts, solar: sd });
+    }
+    if (!results.length) return null;
+
+    results.sort((a, b) => a.ts - b.ts);
+    const pick = results[0];
+    const lunar = L.solarToLunar(pick.solar.year, pick.solar.month, pick.solar.day);
+
+    return {
+      date: new Date(pick.ts),
+      daysLeft: daysBetween(today, pick.ts),
+      solar: { year: pick.solar.year, month: pick.solar.month, day: pick.solar.day },
+      lunar,
+      targetYear: pick.solar.year,
+    };
+  }
+
+  /**
+   * 周岁年龄：按公历年份差计算，今年生日未到则减一。
+   * 说明：农历生日也用公历年差，因为“周岁”日常按公历理解；
+   *       若改用农历年差，会因农历年与公历年不对齐而偏 1 岁。
+   * @returns {number|null}
+   */
+  function ageAt(birthday, occ, todayTs) {
+    if (!birthday.year) return null;
+    const today = todayTs !== undefined ? todayTs : startOfDay();
+    const t = new Date(today);
+    let age = t.getUTCFullYear() - birthday.year;
+
+    if (birthday.calendar === 'lunar') {
+      const nowLunar = L.solarToLunar(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+      if (!nowLunar) return null;
+      const passed = nowLunar.month > birthday.month ||
+        (nowLunar.month === birthday.month && nowLunar.day >= birthday.day);
+      if (!passed) age -= 1;
+    } else {
+      const passed = (t.getUTCMonth() + 1) > birthday.month ||
+        ((t.getUTCMonth() + 1) === birthday.month && t.getUTCDate() >= birthday.day);
+      if (!passed) age -= 1;
+    }
+    return age >= 0 ? age : null;
+  }
+
+  const WEEK_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  function formatSolar(sd) {
+    return `${sd.month}月${sd.day}日`;
+  }
+
+  function formatWeekday(date) {
+    return WEEK_CN[date.getUTCDay()];
+  }
+
+  /**
+   * 汇总列表：附带倒数信息并排序
+   * @param list 生日数组
+   * @param todayTs 可选
+   */
+  function summarize(list, todayTs) {
+    const today = todayTs !== undefined ? todayTs : startOfDay();
+    const out = [];
+    for (const b of list || []) {
+      const occ = nextOccurrence(b, today);
+      if (!occ) {
+        out.push({ birthday: b, occ: null, error: '日期无法计算' });
+        continue;
+      }
+      out.push({
+        birthday: b,
+        occ,
+        age: ageAt(b, occ, today),
+        isToday: occ.daysLeft === 0,
+        lunarText: L.formatLunar(occ.lunar),
+        solarText: formatSolar(occ.solar),
+        weekday: formatWeekday(occ.date),
+      });
+    }
+    out.sort((a, b) => {
+      if (a.isToday !== b.isToday) return a.isToday ? -1 : 1;
+      const da = a.occ ? a.occ.daysLeft : Infinity;
+      const db = b.occ ? b.occ.daysLeft : Infinity;
+      if (da !== db) return da - db;
+      return String(a.birthday.name).localeCompare(String(b.birthday.name), 'zh');
+    });
+    return out;
+  }
+
+  /** 生成简短文案用于扩展角标 */
+  function badgeText(items) {
+    const valid = (items || []).filter((x) => x.occ);
+    if (!valid.length) return '';
+    const min = Math.min(...valid.map((x) => x.occ.daysLeft));
+    if (min > 99) return '99+';
+    return String(min);
+  }
+
+  return {
+    MS_PER_DAY, startOfDay, daysBetween,
+    lunarDateInYear, solarDateInYear, nextOccurrence, ageAt,
+    summarize, badgeText, formatSolar, formatWeekday, WEEK_CN,
+  };
+});
+
+</script>
+<script>
+/* ==== storage (源 sha256 9ac38a40ac6c) ==== */
+/**
+ * 存储层：统一管理 chrome.storage.local 中的生日数据与设置
+ */
+(function (root) {
+  const KEY_BIRTHDAYS = 'birthdays';
+  const KEY_SETTINGS = 'settings';
+
+  const DEFAULT_SETTINGS = {
+    showAge: true,          // 显示周岁
+    badgeEnabled: true,     // 扩展图标显示最近天数角标
+    badgeThreshold: 30,     // 角标只在此天数内显示（0 表示始终显示）
+    leapFallback: 'normal', // 闰月生日在无闰月之年：normal=用同名普通月
+    sortMode: 'daysLeft',   // daysLeft | name | month
+    showHero: true,         // 网页版：顶部显示放大的"下一个生日"卡片
+    compact: false,         // 小组件版：紧凑模式
+    theme: 'auto',          // auto | dark | light
+  };
+
+/* __WEB_FALLBACK__ */
+  const isExt = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+  const LS_PREFIX = 'itab-bcd:';
+
+  function lsGet(keys) {
+    const out = {};
+    const list = typeof keys === 'string' ? [keys] : (Array.isArray(keys) ? keys : Object.keys(keys || {}));
+    for (const k of list) {
+      try {
+        const raw = localStorage.getItem(LS_PREFIX + k);
+        out[k] = raw === null ? undefined : JSON.parse(raw);
+      } catch (e) { out[k] = undefined; }
+    }
+    return out;
+  }
+
+  function lsSet(obj) {
+    for (const [k, v] of Object.entries(obj)) {
+      try { localStorage.setItem(LS_PREFIX + k, JSON.stringify(v)); } catch (e) {}
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('itab-bcd-change', { detail: Object.keys(obj) }));
+    } catch (e) {}
+  }
+
+  function get(keys) {
+    if (isExt) {
+      return new Promise((resolve) => {
+        chrome.storage.local.get(keys, (r) => resolve(r || {}));
+      });
+    }
+    return Promise.resolve(lsGet(keys));
+  }
+
+  function set(obj) {
+    if (isExt) {
+      return new Promise((resolve) => {
+        chrome.storage.local.set(obj, () => resolve(true));
+      });
+    }
+    lsSet(obj);
+    return Promise.resolve(true);
+  }
+
+  async function loadBirthdays() {
+    const r = await get(KEY_BIRTHDAYS);
+    return Array.isArray(r[KEY_BIRTHDAYS]) ? r[KEY_BIRTHDAYS] : [];
+  }
+
+  async function saveBirthdays(list) {
+    await set({ [KEY_BIRTHDAYS]: list });
+    return list;
+  }
+
+  async function loadSettings() {
+    const r = await get(KEY_SETTINGS);
+    return Object.assign({}, DEFAULT_SETTINGS, r[KEY_SETTINGS] || {});
+  }
+
+  async function saveSettings(s) {
+    const merged = Object.assign({}, DEFAULT_SETTINGS, s || {});
+    await set({ [KEY_SETTINGS]: merged });
+    return merged;
+  }
+
+  function newId() {
+    return 'b_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+  }
+
+  async function addBirthday(item) {
+    const list = await loadBirthdays();
+    const rec = Object.assign({ id: newId() }, item);
+    list.push(rec);
+    await saveBirthdays(list);
+    return rec;
+  }
+
+  async function updateBirthday(id, patch) {
+    const list = await loadBirthdays();
+    const i = list.findIndex((x) => x.id === id);
+    if (i < 0) return null;
+    list[i] = Object.assign({}, list[i], patch, { id });
+    await saveBirthdays(list);
+    return list[i];
+  }
+
+  async function removeBirthday(id) {
+    const list = await loadBirthdays();
+    const next = list.filter((x) => x.id !== id);
+    await saveBirthdays(next);
+    return next;
+  }
+
+  const api = {
+    KEY_BIRTHDAYS, KEY_SETTINGS, DEFAULT_SETTINGS,
+    get, set, loadBirthdays, saveBirthdays, loadSettings, saveSettings,
+    newId, addBirthday, updateBirthday, removeBirthday,
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  (function (g) {
+    if (g) g.Storage = api;
+  })(typeof globalThis !== 'undefined' ? globalThis
+    : typeof self !== 'undefined' ? self
+      : typeof window !== 'undefined' ? window
+        : null);
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+/* ==== app (源 sha256 f75581a1d425) ==== */
+/* 亲人生日倒计时 — 网页版逻辑 */
+(function () {
+  const { MONTH_CN, DAY_CN, formatLunar } = LunarUtil;
+  const { summarize, nextOccurrence, ageAt, startOfDay } = BirthdayUtil;
+
+  const $ = (id) => document.getElementById(id);
+  const WEEK_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  let cache = [];
+  let settings = {};
+  let editingId = null;
+  let sortMode = 'daysLeft';
+  let heroIndex = 0;      // 同日多人时可切换
+  let lastItems = [];
+
+  // ---------------------------------------------------------------- 网址参数
+  // 用途：把数据编码进网址，分享出去的链接对方能直接看到内容，
+  // 而不是面对空白页（数据默认存在各自浏览器的 localStorage 里）。
+  // 同时接受 ?a=b 与 #a=b：file:// 下浏览器不解析 query，用 hash 更稳。
+  function readParams() {
+    const out = {};
+    const take = (s) => {
+      if (!s) return;
+      new URLSearchParams(s.replace(/^[?#]/, '')).forEach((v, k) => { out[k] = v; });
+    };
+    take(location.search);
+    take(location.hash);
+    return out;
+  }
+
+  function b64DecodeUtf8(s) {
+    const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function b64EncodeUtf8(str) {
+    const bytes = new TextEncoder().encode(str);
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  const PARAMS = readParams();
+  let URL_RAW = null;   // 网址里带来的原始数据
+  let SHARE_MODE = false;
+
+  if (PARAMS.data) {
+    try {
+      const parsed = JSON.parse(b64DecodeUtf8(PARAMS.data));
+      const arr = Array.isArray(parsed) ? parsed : parsed.birthdays;
+      if (Array.isArray(arr)) { URL_RAW = arr; SHARE_MODE = true; }
+    } catch (e) {
+      // 参数被截断或不是合法数据时静默忽略：这不是程序错误，
+      // 用户仍可正常使用（只是看不到链接里带的内容）
+      URL_RAW = null;
+      SHARE_MODE = false;
+    }
+  }
+  if (PARAMS.theme === 'dark' || PARAMS.theme === 'light') {
+    document.documentElement.setAttribute('data-theme', PARAMS.theme);
+  }
+  if (PARAMS.title) document.title = PARAMS.title;
+
+  /** 生成"带数据"的可分享链接 */
+  function buildShareUrl() {
+    const payload = JSON.stringify({ birthdays: cache });
+    const base = (location.origin && location.origin !== 'null')
+      ? location.origin + location.pathname
+      : location.href.split(/[?#]/)[0];
+    return base + '?data=' + b64EncodeUtf8(payload);
+  }
+
+  // ---------------------------------------------------------------- 主题
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+  }
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    Storage.saveSettings({ theme: next });
+  }
+
+  // ---------------------------------------------------------------- 提示
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('show'), 1900);
+  }
+
+  // ---------------------------------------------------------------- 文案
+  function daysText(n) {
+    if (n === 0) return { num: '今天', unit: '' };
+    if (n === 1) return { num: '明天', unit: '' };
+    return { num: String(n), unit: '天后' };
+  }
+
+  function calendarTag(b) {
+    const s = document.createElement('span');
+    s.className = 'tag' + (b.calendar === 'lunar' ? ' lunar' : '');
+    s.textContent = b.calendar === 'lunar'
+      ? (b.isLeap ? '农历闰月' : '农历')
+      : '公历';
+    return s;
+  }
+
+  function dateLine(it) {
+    const b = it.birthday;
+    return b.calendar === 'lunar'
+      ? `${it.lunarText} → 公历 ${it.solarText} ${it.weekday}`
+      : `${it.solarText} ${it.weekday}（农历 ${it.lunarText}）`;
+  }
+
+  // ---------------------------------------------------------------- 渲染
+  function renderHero(valid) {
+    const wrap = $('heroWrap');
+    wrap.innerHTML = '';
+    if (!settings.showHero || !valid.length) return;
+
+    const hero = valid[heroIndex % valid.length];
+    const d = daysText(hero.occ.daysLeft);
+
+    const el = document.createElement('div');
+    el.className = 'hero' + (hero.isToday ? ' today' : '');
+
+    const big = document.createElement('div');
+    big.className = 'big';
+    big.appendChild(document.createTextNode(d.num));
+    if (d.unit) {
+      const u = document.createElement('span');
+      u.className = 'unit';
+      u.textContent = d.unit;
+      big.appendChild(u);
+    }
+
+    const who = document.createElement('div');
+    who.className = 'who';
+    const nm = document.createElement('div');
+    nm.className = 'nm';
+    nm.textContent = hero.birthday.name + (hero.isToday ? ' 生日快乐 🎂' : '');
+    const dt = document.createElement('div');
+    dt.className = 'dt';
+    dt.appendChild(calendarTag(hero.birthday));
+    dt.appendChild(document.createTextNode(dateLine(hero)));
+    who.appendChild(nm);
+    who.appendChild(dt);
+
+    if (settings.showAge && hero.age !== null && hero.age !== undefined) {
+      const ag = document.createElement('div');
+      ag.className = 'age';
+      ag.textContent = '周岁 ' + hero.age;
+      who.appendChild(ag);
+    }
+
+    if (hero.birthday.note) {
+      const nt = document.createElement('div');
+      nt.className = 'age';
+      nt.textContent = '📝 ' + hero.birthday.note;
+      who.appendChild(nt);
+    }
+
+    el.appendChild(big);
+    el.appendChild(who);
+
+    // 同日/多人时提供切换
+    if (valid.length > 1) {
+      el.style.cursor = 'pointer';
+      el.title = '点击查看下一位';
+      el.onclick = () => { heroIndex = (heroIndex + 1) % valid.length; render(); };
+    }
+    wrap.appendChild(el);
+  }
+
+  function renderGrid(valid) {
+    const grid = $('grid');
+    grid.innerHTML = '';
+    const compact = !settings.showAge;
+
+    if (!valid.length) {
+      const e = document.createElement('div');
+      e.className = 'empty';
+      e.style.gridColumn = '1 / -1';
+      const big = document.createElement('div');
+      big.className = 'big';
+      big.textContent = '🎂';
+      const t = document.createElement('div');
+      t.textContent = '还没有添加生日';
+      const s = document.createElement('div');
+      s.style.fontSize = '13px';
+      s.style.marginTop = '6px';
+      s.textContent = '点右上角「＋ 添加生日」开始';
+      e.appendChild(big); e.appendChild(t); e.appendChild(s);
+      grid.appendChild(e);
+      return;
+    }
+
+    valid.forEach((it) => {
+      const b = it.birthday;
+      const card = document.createElement('div');
+      card.className = 'card' + (it.isToday ? ' today' : (it.occ.daysLeft <= 7 ? ' soon' : ''));
+      card.title = '点击查看详情';
+      card.onclick = () => openDrawer(b.id);
+
+      const n = document.createElement('div');
+      n.className = 'n';
+      const d = daysText(it.occ.daysLeft);
+      n.appendChild(document.createTextNode(d.num));
+      if (d.unit) {
+        const sm = document.createElement('small');
+        sm.textContent = d.unit;
+        n.appendChild(sm);
+      }
+
+      const info = document.createElement('div');
+      info.className = 'info';
+      const nmEl = document.createElement('div');
+      nmEl.className = 'nm';
+      nmEl.textContent = b.name;
+      const dtEl = document.createElement('div');
+      dtEl.className = 'dt';
+      dtEl.appendChild(calendarTag(b));
+      dtEl.appendChild(document.createTextNode(dateLine(it)));
+      info.appendChild(nmEl);
+      info.appendChild(dtEl);
+      if (b.note) {
+        const nt = document.createElement('div');
+        nt.className = 'note';
+        nt.textContent = '📝 ' + b.note;
+        info.appendChild(nt);
+      }
+
+      card.appendChild(n);
+      card.appendChild(info);
+      if (!compact && it.age !== null && it.age !== undefined) {
+        const ag = document.createElement('span');
+        ag.className = 'age';
+        ag.textContent = it.age + ' 岁';
+        card.appendChild(ag);
+      }
+      grid.appendChild(card);
+    });
+  }
+
+  function renderManage() {
+    const wrap = $('manageList');
+    wrap.innerHTML = '';
+    if (!cache.length) {
+      const d = document.createElement('div');
+      d.className = 'hint';
+      d.textContent = '暂无数据';
+      wrap.appendChild(d);
+      return;
+    }
+    cache.forEach((b) => {
+      const el = document.createElement('div');
+      el.className = 'li';
+      const g = document.createElement('div');
+      g.className = 'grow';
+      const nm = document.createElement('div');
+      nm.className = 'nm';
+      nm.textContent = b.name;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = b.calendar === 'lunar'
+        ? `农历${b.isLeap ? '闰' : ''}${MONTH_CN[b.month - 1]}月${DAY_CN[b.day - 1]}`
+          + (b.year ? ` · ${b.year} 年生` : '')
+        : `公历 ${b.month} 月 ${b.day} 日` + (b.year ? ` · ${b.year} 年生` : '');
+      g.appendChild(nm);
+      g.appendChild(meta);
+
+      const eb = document.createElement('button');
+      eb.className = 'mini';
+      eb.textContent = '编辑';
+      eb.onclick = () => startEdit(b.id);
+      const db = document.createElement('button');
+      db.className = 'mini danger';
+      db.textContent = '删除';
+      db.onclick = () => doDelete(b.id, b.name);
+
+      el.appendChild(g); el.appendChild(eb); el.appendChild(db);
+      wrap.appendChild(el);
+    });
+  }
+
+  function render() {
+    const now = new Date();
+    $('todayLabel').textContent =
+      `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${WEEK_CN[now.getDay()]}`;
+
+    let items = summarize(cache, startOfDay());
+    // 无法计算的排在最后
+    const valid = items.filter((x) => x.occ);
+    const invalid = items.filter((x) => !x.occ);
+
+    if (sortMode === 'name') {
+      valid.sort((a, b) => String(a.birthday.name).localeCompare(String(b.birthday.name), 'zh'));
+    } else if (sortMode === 'month') {
+      valid.sort((a, b) =>
+        (a.birthday.month - b.birthday.month) || (a.birthday.day - b.birthday.day));
+    }
+    lastItems = valid.concat(invalid);
+
+    renderHero(valid);
+    renderGrid(lastItems);
+
+    // 标题动态化：不打开也知道倒计时
+    const next = valid[0];
+    if (!valid.length) document.title = '亲人生日倒计时';
+    else if (next.isToday) document.title = `🎂 ${next.birthday.name} 生日快乐`;
+    else document.title = `${next.occ.daysLeft}天 · ${next.birthday.name}生日`;
+  }
+
+  // ---------------------------------------------------------------- 数据
+  /** 归一化一条生日记录，缺 id 时补上 */
+  function normalizeOne(raw, prefix) {
+    if (!raw || !raw.name) return null;
+    const month = Number(raw.month), day = Number(raw.day);
+    if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 30)) return null;
+    const cal = raw.calendar === 'lunar' ? 'lunar' : 'solar';
+    return {
+      id: raw.id || (prefix + month + '_' + day + '_' + String(raw.name).slice(0, 8)),
+      name: String(raw.name).slice(0, 20),
+      calendar: cal, month, day,
+      isLeap: cal === 'lunar' ? !!raw.isLeap : false,
+      year: Number(raw.year) || undefined,
+      note: raw.note ? String(raw.note).slice(0, 120) : undefined,
+    };
+  }
+
+  async function loadAll() {
+    const local = await Storage.loadBirthdays();
+    let merged = local;
+
+    if (URL_RAW) {
+      // 网址数据 + 本地数据合并；按「名字+月+日」去重，网址版本优先
+      const key = (x) => `${x.name}|${x.month}|${x.day}|${x.calendar}`;
+      const seen = new Set();
+      const out = [];
+      for (const raw of URL_RAW) {
+        const n = normalizeOne(raw, 'url_');
+        if (!n) continue;
+        const k = key(n);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(n);
+      }
+      for (const raw of local) {
+        const n = normalizeOne(raw, 'loc_');
+        if (!n) continue;
+        const k = key(n);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(n);
+      }
+      merged = out;
+    }
+
+    cache = merged;
+    settings = await Storage.loadSettings();
+    sortMode = settings.sortMode || 'daysLeft';
+    const forced = document.documentElement.getAttribute('data-theme');
+    if (!forced) {
+      applyTheme(settings.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    }
+    $('optAge').checked = !!settings.showAge;
+    $('optHero').checked = settings.showHero !== false;
+    [...$('sortSeg').children].forEach((b) => {
+      b.classList.toggle('on', b.dataset.sort === sortMode);
+    });
+    renderShareBanner();
+    render();
+    renderManage();
+  }
+
+  /** 分享链接打开时的提示条 */
+  function renderShareBanner() {
+    const el = $('shareBanner');
+    if (!el) return;
+    if (!SHARE_MODE) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    const fromUrl = cache.filter((x) => String(x.id).startsWith('url_')).length;
+    if (fromUrl) {
+      el.textContent = `📎 这是分享链接，内含 ${fromUrl} 条生日；你自己添加的会一起显示` +
+        `并保存在本机。链接里的内容是固定的。`;
+    } else {
+      el.textContent = '📎 这是分享链接。你添加的生日会保存在本机，不会影响链接内容。';
+    }
+  }
+
+  // ---------------------------------------------------------------- 表单
+  function isLunar() { return $('fCal').value === 'lunar'; }
+
+  function fillMonths() {
+    const sel = $('fMonth');
+    const cur = sel.value;
+    sel.innerHTML = '';
+    const names = isLunar() ? MONTH_CN.map((c) => c + '月')
+      : Array.from({ length: 12 }, (_, i) => (i + 1) + ' 月');
+    names.forEach((n, i) => {
+      const o = document.createElement('option');
+      o.value = String(i + 1);
+      o.textContent = n;
+      sel.appendChild(o);
+    });
+    sel.value = cur || '1';
+  }
+
+  function fillDays() {
+    const sel = $('fDay');
+    const cur = Number(sel.value) || 1;
+    const m = Number($('fMonth').value) || 1;
+    sel.innerHTML = '';
+    const max = isLunar() ? 30 : new Date(2000, m, 0).getDate();
+    for (let d = 1; d <= max; d++) {
+      const o = document.createElement('option');
+      o.value = String(d);
+      o.textContent = isLunar() ? DAY_CN[d - 1] : String(d);
+      sel.appendChild(o);
+    }
+    sel.value = String(Math.min(cur, max));
+    $('leapRow').style.display = isLunar() ? '' : 'none';
+  }
+
+  function formValue() {
+    const y = $('fYear').value.trim();
+    const note = $('fNote').value.trim();
+    return {
+      name: $('fName').value.trim(),
+      calendar: $('fCal').value,
+      month: Number($('fMonth').value),
+      day: Number($('fDay').value),
+      isLeap: isLunar() ? $('fLeap').checked : false,
+      year: y ? Number(y) : undefined,
+      note: note || undefined,
+    };
+  }
+
+  function updatePreview() {
+    const b = formValue();
+    const el = $('preview');
+    if (!b.name) {
+      el.textContent = '填写后这里会显示下一次生日的日期';
+      return;
+    }
+    const today = startOfDay();
+    const occ = nextOccurrence(b, today);
+    if (!occ) { el.innerHTML = '<span class="err">该日期无法计算，请检查月份与日期</span>'; return; }
+    const when = occ.daysLeft === 0 ? '就是今天 🎂'
+      : occ.daysLeft === 1 ? '明天' : `还有 ${occ.daysLeft} 天`;
+    const age = ageAt(b, occ, today);
+    el.innerHTML =
+      `下一次：<b>${occ.solar.year}-${String(occ.solar.month).padStart(2, '0')}-` +
+      `${String(occ.solar.day).padStart(2, '0')}</b>（${formatLunar(occ.lunar)}）· <b>${when}</b>` +
+      (age !== null ? ` · 周岁 <b>${age}</b>` : '');
+  }
+
+  function resetForm() {
+    editingId = null;
+    $('fName').value = '';
+    $('fCal').value = 'solar';
+    $('fYear').value = '';
+    $('fNote').value = '';
+    $('fLeap').checked = false;
+    fillMonths(); $('fMonth').value = '1';
+    fillDays(); $('fDay').value = '1';
+    $('dTitle').textContent = '添加生日';
+    $('saveBtn').textContent = '保存';
+    updatePreview();
+  }
+
+  function startEdit(id) {
+    const b = cache.find((x) => x.id === id);
+    if (!b) {
+      openDrawer();
+      return;
+    }
+    editingId = id;
+    $('fName').value = b.name || '';
+    $('fCal').value = b.calendar || 'solar';
+    fillMonths(); $('fMonth').value = String(b.month);
+    fillDays(); $('fDay').value = String(b.day);
+    $('fLeap').checked = !!b.isLeap;
+    $('fYear').value = b.year ? String(b.year) : '';
+    $('fNote').value = b.note || '';
+    $('dTitle').textContent = '编辑：' + b.name;
+    $('saveBtn').textContent = '更新';
+    updatePreview();
+    openDrawer(id);
+  }
+
+  async function doDelete(id, name) {
+    if (!confirm(`确定删除「${name}」的生日吗？`)) return;
+    await Storage.removeBirthday(id);
+    cache = await Storage.loadBirthdays();
+    render(); renderManage();
+    if (editingId === id) resetForm();
+    toast('已删除');
+  }
+
+  // ---------------------------------------------------------------- 抽屉
+  function openDrawer() {
+    $('drawer').classList.add('open');
+    $('mask').classList.add('open');
+  }
+  function closeDrawer() {
+    $('drawer').classList.remove('open');
+    $('mask').classList.remove('open');
+  }
+
+  // ---------------------------------------------------------------- 事件
+  $('addBtn').onclick = () => { resetForm(); openDrawer(); };
+  $('manageBtn').onclick = () => { resetForm(); openDrawer(); };
+  $('dClose').onclick = closeDrawer;
+  $('mask').onclick = closeDrawer;
+  $('themeBtn').onclick = toggleTheme;
+
+  $('sortSeg').onclick = (e) => {
+    const btn = e.target.closest('button[data-sort]');
+    if (!btn) return;
+    sortMode = btn.dataset.sort;
+    Storage.saveSettings({ sortMode });
+    [...$('sortSeg').children].forEach((b) => b.classList.toggle('on', b === btn));
+    render();
+  };
+
+  $('fCal').onchange = () => { fillMonths(); fillDays(); updatePreview(); };
+  $('fMonth').onchange = () => { fillDays(); updatePreview(); };
+  $('fDay').onchange = updatePreview;
+  $('fLeap').onchange = updatePreview;
+  $('fName').oninput = updatePreview;
+  $('fYear').oninput = updatePreview;
+  $('resetBtn').onclick = resetForm;
+
+  $('saveBtn').onclick = async () => {
+    const b = formValue();
+    if (!b.name) { toast('请填写称呼'); $('fName').focus(); return; }
+    if (b.year !== undefined && (b.year < 1900 || b.year > 2100)) {
+      toast('出生年份需在 1900–2100 之间'); return;
+    }
+    if (!nextOccurrence(b, startOfDay())) { toast('该日期无法计算，请检查'); return; }
+
+    if (editingId) { await Storage.updateBirthday(editingId, b); toast('已更新'); }
+    else { await Storage.addBirthday(b); toast('已添加'); }
+    cache = await Storage.loadBirthdays();
+    render(); renderManage();
+    resetForm();
+  };
+
+  $('optAge').onchange = async (e) => {
+    await Storage.saveSettings({ showAge: e.target.checked });
+    settings = await Storage.loadSettings();
+    render();
+  };
+  $('optHero').onchange = async (e) => {
+    await Storage.saveSettings({ showHero: e.target.checked });
+    settings = await Storage.loadSettings();
+    render();
+  };
+
+  // ---------------------------------------------------------------- 导入导出
+  $('exportBtn').onclick = () => {
+    const payload = {
+      app: 'birthday-countdown-web', version: 1,
+      exportedAt: new Date().toISOString(), birthdays: cache,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    a.href = url;
+    a.download = `生日倒计时备份-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    toast('已导出');
+  };
+
+  $('importBtn').onclick = () => $('fileInput').click();
+
+  $('shareBtn').onclick = () => {
+    if (!cache.length) { toast('先添加生日再生成分享链接'); return; }
+    const url = buildShareUrl();
+    const out = $('shareOut');
+    out.style.display = '';
+    out.innerHTML = '';
+    const tip = document.createElement('div');
+    tip.textContent = `链接长度 ${url.length} 字符。对方打开即可看到这 ${cache.length} 条生日。` +
+      `（太长的话，聊天工具可能会截断，可以改用导出 JSON 发给对方）`;
+    const code = document.createElement('code');
+    code.textContent = url;
+    out.appendChild(tip);
+    out.appendChild(code);
+    // 尝试写入剪贴板
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        () => toast('链接已复制到剪贴板'),
+        () => toast('链接已生成，请手动复制')
+      );
+    } else {
+      toast('链接已生成，请手动复制');
+    }
+  };
+  $('fileInput').onchange = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      const arr = Array.isArray(data) ? data : data.birthdays;
+      if (!Array.isArray(arr)) throw new Error('格式不正确：找不到 birthdays 数组');
+      const clean = [];
+      for (const r of arr) {
+        if (!r || !r.name) continue;
+        const month = Number(r.month), day = Number(r.day);
+        if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 30)) continue;
+        const cal = r.calendar === 'lunar' ? 'lunar' : 'solar';
+        if (cal === 'solar' && day > 31) continue;
+        clean.push({
+          id: Storage.newId(),
+          name: String(r.name).slice(0, 20),
+          calendar: cal, month, day,
+          isLeap: cal === 'lunar' ? !!r.isLeap : false,
+          year: Number(r.year) || undefined,
+          note: r.note ? String(r.note).slice(0, 120) : undefined,
+        });
+      }
+      if (!clean.length) { toast('没有可导入的有效数据'); return; }
+      const merge = confirm(`读取到 ${clean.length} 条生日。\n\n确定 = 追加到现有数据\n取消 = 覆盖现有数据`);
+      await Storage.saveBirthdays(merge ? cache.concat(clean) : clean);
+      await loadAll();
+      toast(`已导入 ${clean.length} 条`);
+    } catch (err) {
+      toast('导入失败：' + err.message);
+    }
+  };
+
+  $('clearBtn').onclick = async () => {
+    if (!cache.length) { toast('当前没有数据'); return; }
+    if (!confirm(`确定清空全部 ${cache.length} 条生日数据吗？此操作不可撤销。`)) return;
+    await Storage.saveBirthdays([]);
+    await loadAll();
+    resetForm();
+    toast('已清空');
+  };
+
+  // 跨标签页同步
+  window.addEventListener('itab-bcd-change', () => { loadAll(); });
+  window.addEventListener('storage', (e) => {
+    if (e.key && e.key.startsWith('itab-bcd:')) loadAll();
+  });
+  // 跨零点刷新
+  let lastDay = new Date().getDate();
+  setInterval(() => {
+    const d = new Date().getDate();
+    if (d !== lastDay) { lastDay = d; loadAll(); }
+  }, 60000);
+
+  // Esc 关闭抽屉
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDrawer();
+  });
+
+  // ---------------------------------------------------------------- 启动
+  fillMonths();
+  fillDays();
+  updatePreview();
+  const READY = loadAll();
+
+  // 供调试与自动化测试
+  (typeof globalThis !== 'undefined' ? globalThis : window).__app = {
+    ready: READY,
+    loadAll, render, renderManage, openDrawer, closeDrawer, startEdit,
+    formValue, updatePreview, resetForm,
+    getCache: () => cache,
+    getSettings: () => settings,
+    setSort: (m) => { sortMode = m; render(); },
+  };
+})();
+
+</script>
+</body>
+</html>
